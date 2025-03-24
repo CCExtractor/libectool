@@ -4,7 +4,6 @@
 set(ECTOOL_COMMON_SOURCES
     ec_flash.cc
     ec_panicinfo.cc
-    ectool.cc
     ectool_i2c.cc
     ectool_keyscan.cc
     misc_util.cc
@@ -34,7 +33,7 @@ endif()
 # ============================
 # Add Executable Target: ectool
 # ============================
-add_executable(ectool ${ECTOOL_COMMON_SOURCES})
+add_executable(ectool ectool.cc ${ECTOOL_COMMON_SOURCES})
 
 target_include_directories(ectool PRIVATE
 	../include
@@ -131,6 +130,6 @@ if(WIN32)
 endif()
 
 set_target_properties(libectool PROPERTIES
-    OUTPUT_NAME "libectool"  # Generates `libectool.so` or `libectool.dll`
+    OUTPUT_NAME "ectool"  # Generates `libectool.so` or `libectool.dll`
 )
 

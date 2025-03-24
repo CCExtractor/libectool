@@ -11,7 +11,7 @@
 #include "ec_panicinfo.h"
 #include "ec_flash.h"
 #include "ec_version.h"
-#include "ectool.h"
+// #include "ectool.h"
 #include "i2c.h"
 #include "lightbar.h"
 #include "lock/gec_lock.h"
@@ -27,6 +27,24 @@
 
 #define USB_VID_GOOGLE 0x18d1
 #define USB_PID_HAMMER 0x5022
+#define GEC_LOCK_TIMEOUT_SECS 30 /* 30 secs */
+#define interfaces COMM_ALL
+
+int libectool_init();
+void libectool_release();
+int read_mapped_temperature(int id);
+static uint8_t read_mapped_mem8(uint8_t offset);
+
+
+extern "C" {
+int ascii_mode = 0;
+bool is_on_ac();
+void pause_fan_control();
+void set_fan_speed(int speed);
+float get_max_temperature();
+float get_max_non_battery_temperature();
+
+
 
 // -----------------------------------------------------------------------------
 // Top-level endpoint functions
@@ -152,7 +170,6 @@ float get_max_non_battery_temperature()
                         id);
                     break;
                 default:
-                    cmd_temperature_print(id, mtemp);
                     temp = K_TO_C(mtemp + EC_TEMP_SENSOR_OFFSET);
                 }
             temp = K_TO_C(mtemp + EC_TEMP_SENSOR_OFFSET);
@@ -165,16 +182,14 @@ float get_max_non_battery_temperature()
     libectool_release();
     return max_temp;
 }
-
+}
 
 // -----------------------------------------------------------------------------
 //  Helper functions
 // -----------------------------------------------------------------------------
 
-
-int libectool_init(void)
+int libectool_init()
 {
-    int interfaces = COMM_ALL;
     char device_name[41] = CROS_EC_DEV_NAME;
     uint16_t vid = USB_VID_GOOGLE, pid = USB_PID_HAMMER;
     int i2c_bus = -1;
@@ -217,7 +232,7 @@ int libectool_init(void)
     return 0;
 }
 
-void libectool_release(void)
+void libectool_release()
 {
     /* Release the GEC lock. (This is safe even if no lock was acquired.) */
     release_gec_lock();
@@ -228,7 +243,6 @@ void libectool_release(void)
         comm_usb_exit();
 #endif
 }
-
 
 int read_mapped_temperature(int id)
 {

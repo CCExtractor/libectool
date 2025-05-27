@@ -18,9 +18,9 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_subdirectory(src)
-add_subdirectory(extern)
+add_subdirectory(src/core)
+add_subdirectory(src/extern)
 
 if(WIN32)
-	add_subdirectory(getopt)
+	add_subdirectory(src/getopt)
 endif()

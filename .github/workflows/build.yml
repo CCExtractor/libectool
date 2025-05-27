@@ -10,7 +10,8 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v3
         with:
           submodules: recursive
 
@@ -18,6 +19,15 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y cmake clang ninja-build git libftdi1-dev libusb-1.0-0-dev pkg-config
+
+      - name: Print environment info (for debugging)
+        run: |
+          echo "CC=$CC"
+          echo "CXX=$CXX"
+          clang --version
+          cmake --version
+          ninja --version
+          pwd && ls -al
 
       - name: Configure CMake
         run: |
@@ -30,11 +40,17 @@ jobs:
           cd _build
           ninja
 
+      - name: List build output (for debugging)
+        run: |
+          echo "::group::Build Output"
+          find _build -type f
+          echo "::endgroup::"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
           name: ectool-linux
-          path: _build/src/ectool
+          path: _build/src/core/ectool
 
   build-windows:
     runs-on: windows-2022
@@ -59,5 +75,5 @@ jobs:
         with:
           name: ectool-windows
           path: |
-            _build/src/RelWithDebInfo/ectool.exe
-            _build/src/RelWithDebInfo/ectool.pdb
+            _build/src/core/RelWithDebInfo/ectool.exe
+            _build/src/core/RelWithDebInfo/ectool.pdb

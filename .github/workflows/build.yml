@@ -53,35 +53,3 @@ jobs:
           path: |
             _build/src/core/ectool
             _build/src/core/libectool.so
-
-  build-windows:
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Configure CMake
-        run: |
-          mkdir _build
-          cd _build
-          cmake -G "Ninja" -A x64 -T ClangCL ..
-
-      - name: Build
-        run: |
-          cd _build
-          & cmake --build . --config RelWithDebInfo --parallel
-
-      - name: List built files
-        run: |
-          echo "::group::Built Files"
-          find _build -type f
-          echo "::endgroup::"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ectool-windows
-          path: |
-            _build/src/core/RelWithDebInfo/ectool.exe
-            _build/src/core/RelWithDebInfo/ectool.pdb

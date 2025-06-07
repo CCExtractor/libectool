@@ -20,7 +20,7 @@ After building, you need to move `libectool.so` to a library directory where it 
 ### Option 1 — User-specific (Recommended for non-root users)
 ```sh
 mkdir -p ~/.local/lib
-cp src/libectool.so ~/.local/lib/libectool.so
+cp src/core/libectool.so ~/.local/lib/libectool.so
 export LD_LIBRARY_PATH="$HOME/.local/lib:$LD_LIBRARY_PATH"
 ```
 To make it persistent across sessions, add the export to your shell configuration:
@@ -29,5 +29,5 @@ echo 'export LD_LIBRARY_PATH="$HOME/.local/lib:$LD_LIBRARY_PATH"' >> ~/.bashrc
 ```
 ### Option 2 — Global installation
 ```sh
-sudo cp src/libectool.so /usr/local/lib/libectool.so
+sudo cp src/core/libectool.so /usr/local/lib/libectool.so
 ```

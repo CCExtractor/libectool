@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "libectool.h"
 #include "battery.h"
 #include "comm-host.h"
 #include "comm-usb.h"
@@ -11,7 +12,6 @@
 #include "ec_panicinfo.h"
 #include "ec_flash.h"
 #include "ec_version.h"
-// #include "ectool.h"
 #include "i2c.h"
 #include "lightbar.h"
 #include "lock/gec_lock.h"
@@ -30,21 +30,9 @@
 #define GEC_LOCK_TIMEOUT_SECS 30 /* 30 secs */
 #define interfaces COMM_ALL
 
-int libectool_init();
-void libectool_release();
-int read_mapped_temperature(int id);
-static uint8_t read_mapped_mem8(uint8_t offset);
-
-
-extern "C" {
-int ascii_mode = 0;
-bool is_on_ac();
-void pause_fan_control();
-void set_fan_speed(int speed);
-float get_max_temperature();
-float get_max_non_battery_temperature();
-
-
+// int read_mapped_temperature(int id);
+// static uint8_t read_mapped_mem8(uint8_t offset);
+// int ascii_mode;
 
 // -----------------------------------------------------------------------------
 // Top-level endpoint functions

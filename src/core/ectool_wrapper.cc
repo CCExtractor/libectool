@@ -65,12 +65,12 @@ bool is_on_ac() {
 void pause_fan_control() {
     if (libectool_init() < 0)
         fprintf(stderr, "Failed initializing EC connection\n");
-        
+
     int rv = ec_command(EC_CMD_THERMAL_AUTO_FAN_CTRL, 0, NULL, 0, NULL, 0);
 
     if (rv < 0)
         fprintf(stderr, "Failed to enable auto fan control\n");
-    
+
     libectool_release();
 }
 
@@ -99,7 +99,7 @@ void set_fan_speed(int speed) {
 float get_max_temperature() {
     if (libectool_init() < 0)
         fprintf(stderr, "Failed initializing EC connection\n");
-        
+
     float max_temp = -1.0f;
     int mtemp, temp;
     int id;
@@ -135,10 +135,10 @@ float get_max_non_battery_temperature()
 {
     if (libectool_init() < 0)
         fprintf(stderr, "Failed initializing EC connection\n");
-    
-	struct ec_params_temp_sensor_get_info p;
-	struct ec_response_temp_sensor_get_info r;
-	int rv;
+
+    struct ec_params_temp_sensor_get_info p;
+    struct ec_response_temp_sensor_get_info r;
+    int rv;
     float max_temp = -1.0f;
     int mtemp, temp;
     int id;
@@ -153,7 +153,7 @@ float get_max_non_battery_temperature()
 
         printf("%d: %d %s\n", p.id, r.sensor_type,
                r.sensor_name);
-        
+
         if(strcmp(r.sensor_name, "Battery")){ // not eqaul to battery
             mtemp = read_mapped_temperature(p.id);
             switch (mtemp) {
@@ -178,7 +178,7 @@ float get_max_non_battery_temperature()
             }
         }
     }
-    
+
     libectool_release();
     return max_temp;
 }
@@ -246,35 +246,35 @@ void libectool_release()
 
 int read_mapped_temperature(int id)
 {
-	int rv;
+    int rv;
 
-	if (!read_mapped_mem8(EC_MEMMAP_THERMAL_VERSION)) {
-		/*
-		 *  The temp_sensor_init() is not called, which implies no
-		 * temp sensor is defined.
-		 */
-		rv = EC_TEMP_SENSOR_NOT_PRESENT;
-	} else if (id < EC_TEMP_SENSOR_ENTRIES)
-		rv = read_mapped_mem8(EC_MEMMAP_TEMP_SENSOR + id);
-	else if (read_mapped_mem8(EC_MEMMAP_THERMAL_VERSION) >= 2)
-		rv = read_mapped_mem8(EC_MEMMAP_TEMP_SENSOR_B + id -
-				      EC_TEMP_SENSOR_ENTRIES);
-	else {
-		/* Sensor in second bank, but second bank isn't supported */
-		rv = EC_TEMP_SENSOR_NOT_PRESENT;
-	}
-	return rv;
+    if (!read_mapped_mem8(EC_MEMMAP_THERMAL_VERSION)) {
+        /*
+         *  The temp_sensor_init() is not called, which implies no
+         * temp sensor is defined.
+         */
+        rv = EC_TEMP_SENSOR_NOT_PRESENT;
+    } else if (id < EC_TEMP_SENSOR_ENTRIES)
+        rv = read_mapped_mem8(EC_MEMMAP_TEMP_SENSOR + id);
+    else if (read_mapped_mem8(EC_MEMMAP_THERMAL_VERSION) >= 2)
+        rv = read_mapped_mem8(EC_MEMMAP_TEMP_SENSOR_B + id -
+                      EC_TEMP_SENSOR_ENTRIES);
+    else {
+        /* Sensor in second bank, but second bank isn't supported */
+        rv = EC_TEMP_SENSOR_NOT_PRESENT;
+    }
+    return rv;
 }
 
 static uint8_t read_mapped_mem8(uint8_t offset)
 {
-	int ret;
-	uint8_t val;
+    int ret;
+    uint8_t val;
 
-	ret = ec_readmem(offset, sizeof(val), &val);
-	if (ret <= 0) {
-		fprintf(stderr, "failure in %s(): %d\n", __func__, ret);
-		exit(1);
-	}
-	return val;
+    ret = ec_readmem(offset, sizeof(val), &val);
+    if (ret <= 0) {
+        fprintf(stderr, "failure in %s(): %d\n", __func__, ret);
+        exit(1);
+    }
+    return val;
 }

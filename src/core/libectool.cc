@@ -30,9 +30,100 @@
 #define GEC_LOCK_TIMEOUT_SECS 30 /* 30 secs */
 #define interfaces COMM_ALL
 
-// int read_mapped_temperature(int id);
-// static uint8_t read_mapped_mem8(uint8_t offset);
-// int ascii_mode;
+// -----------------------------------------------------------------------------
+//  Helper functions
+// -----------------------------------------------------------------------------
+
+int libectool_init()
+{
+    char device_name[41] = CROS_EC_DEV_NAME;
+    uint16_t vid = USB_VID_GOOGLE, pid = USB_PID_HAMMER;
+    int i2c_bus = -1;
+    /*
+     * First try the preferred /dev interface (which has a built-in mutex).
+     * If the COMM_DEV flag is excluded or comm_init_dev() fails,
+     * then try alternative interfaces.
+     */
+    if (!(interfaces & COMM_DEV) || comm_init_dev(device_name)) {
+        /* For non-USB alt interfaces, we need to acquire the GEC lock */
+        if (!(interfaces & COMM_USB) &&
+            acquire_gec_lock(GEC_LOCK_TIMEOUT_SECS) < 0) {
+            fprintf(stderr, "Could not acquire GEC lock.\n");
+            return -1;
+        }
+        /* If the interface is set to USB, try that (no lock needed) */
+        if (interfaces == COMM_USB) {
+#ifndef _WIN32
+            if (comm_init_usb(vid, pid)) {
+                fprintf(stderr, "Couldn't find EC on USB.\n");
+                /* Release the lock if it was acquired */
+                release_gec_lock();
+                return -1;
+            }
+#endif
+        } else if (comm_init_alt(interfaces, device_name, i2c_bus)) {
+            fprintf(stderr, "Couldn't find EC\n");
+            release_gec_lock();
+            return -1;
+        }
+    }
+
+    /* Initialize ring buffers for sending/receiving EC commands */
+    if (comm_init_buffer()) {
+        fprintf(stderr, "Couldn't initialize buffers\n");
+        release_gec_lock();
+        return -1;
+    }
+
+    return 0;
+}
+
+void libectool_release()
+{
+    /* Release the GEC lock. (This is safe even if no lock was acquired.) */
+    release_gec_lock();
+
+#ifndef _WIN32
+    /* If the interface in use was USB, perform additional cleanup */
+    if (interfaces == COMM_USB)
+        comm_usb_exit();
+#endif
+}
+
+static uint8_t read_mapped_mem8(uint8_t offset)
+{
+    int ret;
+    uint8_t val;
+
+    ret = ec_readmem(offset, sizeof(val), &val);
+    if (ret <= 0) {
+        fprintf(stderr, "failure in %s(): %d\n", __func__, ret);
+        exit(1);
+    }
+    return val;
+}
+
+int read_mapped_temperature(int id)
+{
+    int rv;
+
+    if (!read_mapped_mem8(EC_MEMMAP_THERMAL_VERSION)) {
+        /*
+         *  The temp_sensor_init() is not called, which implies no
+         * temp sensor is defined.
+         */
+        rv = EC_TEMP_SENSOR_NOT_PRESENT;
+    } else if (id < EC_TEMP_SENSOR_ENTRIES)
+        rv = read_mapped_mem8(EC_MEMMAP_TEMP_SENSOR + id);
+    else if (read_mapped_mem8(EC_MEMMAP_THERMAL_VERSION) >= 2)
+        rv = read_mapped_mem8(EC_MEMMAP_TEMP_SENSOR_B + id -
+                      EC_TEMP_SENSOR_ENTRIES);
+    else {
+        /* Sensor in second bank, but second bank isn't supported */
+        rv = EC_TEMP_SENSOR_NOT_PRESENT;
+    }
+    return rv;
+}
 
 // -----------------------------------------------------------------------------
 // Top-level endpoint functions
@@ -169,100 +260,4 @@ float get_max_non_battery_temperature()
 
     libectool_release();
     return max_temp;
-}
-}
-
-// -----------------------------------------------------------------------------
-//  Helper functions
-// -----------------------------------------------------------------------------
-
-int libectool_init()
-{
-    char device_name[41] = CROS_EC_DEV_NAME;
-    uint16_t vid = USB_VID_GOOGLE, pid = USB_PID_HAMMER;
-    int i2c_bus = -1;
-    /*
-     * First try the preferred /dev interface (which has a built-in mutex).
-     * If the COMM_DEV flag is excluded or comm_init_dev() fails,
-     * then try alternative interfaces.
-     */
-    if (!(interfaces & COMM_DEV) || comm_init_dev(device_name)) {
-        /* For non-USB alt interfaces, we need to acquire the GEC lock */
-        if (!(interfaces & COMM_USB) &&
-            acquire_gec_lock(GEC_LOCK_TIMEOUT_SECS) < 0) {
-            fprintf(stderr, "Could not acquire GEC lock.\n");
-            return -1;
-        }
-        /* If the interface is set to USB, try that (no lock needed) */
-        if (interfaces == COMM_USB) {
-#ifndef _WIN32
-            if (comm_init_usb(vid, pid)) {
-                fprintf(stderr, "Couldn't find EC on USB.\n");
-                /* Release the lock if it was acquired */
-                release_gec_lock();
-                return -1;
-            }
-#endif
-        } else if (comm_init_alt(interfaces, device_name, i2c_bus)) {
-            fprintf(stderr, "Couldn't find EC\n");
-            release_gec_lock();
-            return -1;
-        }
-    }
-
-    /* Initialize ring buffers for sending/receiving EC commands */
-    if (comm_init_buffer()) {
-        fprintf(stderr, "Couldn't initialize buffers\n");
-        release_gec_lock();
-        return -1;
-    }
-
-    return 0;
-}
-
-void libectool_release()
-{
-    /* Release the GEC lock. (This is safe even if no lock was acquired.) */
-    release_gec_lock();
-
-#ifndef _WIN32
-    /* If the interface in use was USB, perform additional cleanup */
-    if (interfaces == COMM_USB)
-        comm_usb_exit();
-#endif
-}
-
-int read_mapped_temperature(int id)
-{
-    int rv;
-
-    if (!read_mapped_mem8(EC_MEMMAP_THERMAL_VERSION)) {
-        /*
-         *  The temp_sensor_init() is not called, which implies no
-         * temp sensor is defined.
-         */
-        rv = EC_TEMP_SENSOR_NOT_PRESENT;
-    } else if (id < EC_TEMP_SENSOR_ENTRIES)
-        rv = read_mapped_mem8(EC_MEMMAP_TEMP_SENSOR + id);
-    else if (read_mapped_mem8(EC_MEMMAP_THERMAL_VERSION) >= 2)
-        rv = read_mapped_mem8(EC_MEMMAP_TEMP_SENSOR_B + id -
-                      EC_TEMP_SENSOR_ENTRIES);
-    else {
-        /* Sensor in second bank, but second bank isn't supported */
-        rv = EC_TEMP_SENSOR_NOT_PRESENT;
-    }
-    return rv;
-}
-
-static uint8_t read_mapped_mem8(uint8_t offset)
-{
-    int ret;
-    uint8_t val;
-
-    ret = ec_readmem(offset, sizeof(val), &val);
-    if (ret <= 0) {
-        fprintf(stderr, "failure in %s(): %d\n", __func__, ret);
-        exit(1);
-    }
-    return val;
 }

@@ -56,7 +56,7 @@ target_link_libraries(ectool ${libusb_LIBRARIES} ${libftdi1_LIBRARIES})
 # Add Shared Library : libectool.so
 # ============================
 
-set(LIBECTOOL_SOURCES ${ECTOOL_COMMON_SOURCES} ectool_wrapper.cc)
+set(LIBECTOOL_SOURCES ${ECTOOL_COMMON_SOURCES} libectool.cc)
 
 add_library(libectool SHARED ${LIBECTOOL_SOURCES})
 

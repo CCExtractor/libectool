@@ -142,7 +142,7 @@ bool is_on_ac() {
     return ac_present;
 }
 
-void pause_fan_control() {
+void auto_fan_control() {
     if (libectool_init() < 0)
         fprintf(stderr, "Failed initializing EC connection\n");
 
@@ -154,23 +154,23 @@ void pause_fan_control() {
     libectool_release();
 }
 
-void set_fan_speed(int speed) {
+void set_fan_duty(int duty) {
     if (libectool_init() < 0)
         fprintf(stderr, "Failed initializing EC connection\n");
 
     struct ec_params_pwm_set_fan_duty_v0 p_v0;
     int rv;
 
-    if (speed < 0 || speed > 100) {
-        fprintf(stderr, "Error: Fan speed must be between 0 and 100.\n");
+    if (duty < 0 || duty > 100) {
+        fprintf(stderr, "Error: Fan duty cycle must be between 0 and 100.\n");
         return;
     }
 
-    p_v0.percent = speed;
+    p_v0.percent = duty;
     rv = ec_command(EC_CMD_PWM_SET_FAN_DUTY, 0, &p_v0, sizeof(p_v0),
             NULL, 0);
     if (rv < 0)
-        fprintf(stderr, "Error: Can't set speed\n");
+        fprintf(stderr, "Error: Can't set duty cycle\n");
 
     libectool_release();
 }

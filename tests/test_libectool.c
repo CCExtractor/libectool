@@ -34,13 +34,13 @@ int main() {
                 break;
             }
             case 2:
-                printf("Pausing fan control...\n");
-                pause_fan_control();
+                printf("Enable automatic fan control...\n");
+                auto_fan_control();
                 break;
             case 3:
                 printf("Enter fan speed (0-100): ");
                 if (scanf("%d", &speed) == 1) {
-                    set_fan_speed(speed);
+                    set_fan_duty(speed);
                 } else {
                     printf("Invalid speed.\n");
                     // clear invalid input

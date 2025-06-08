@@ -13,8 +13,8 @@ void libectool_release();
 
 // API functions to expose
 bool is_on_ac();
-void pause_fan_control();
-void set_fan_speed(int speed);
+void auto_fan_control();
+void set_fan_duty(int duty);
 float get_max_temperature();
 float get_max_non_battery_temperature();
 

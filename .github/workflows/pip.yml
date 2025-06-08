@@ -21,6 +21,11 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Install system dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y libusb-1.0-0-dev libftdi1-dev pkg-config
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:

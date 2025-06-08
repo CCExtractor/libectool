@@ -4,16 +4,15 @@ build-backend = "scikit_build_core.build"
 
 
 [project]
-name = "libectool"
+name = "pyectool"
 version = "0.0.1"
-description="A shared library (libectool) that exposes ectool functionalities for seamless integration with other applications"
+description="Python bindings for ectool using pybind11, enabling seamless integration with other applications"
 readme = "README.md"
 authors = [
   { name = "Ahmed Gamea", email = "ahmed.gamea@ejust.edu.eg" },
 ]
 
 [tool.scikit-build]
-wheel.expand-macos-universal-tags = true
 minimum-version = "build-system.requires"
 
 [tool.cibuildwheel]

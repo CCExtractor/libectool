@@ -26,7 +26,7 @@ else()
 endif()
 
 # ============================
-# Add Executable Target: ectool
+# Add Executable Target: ectool (CLI)
 # ============================
 add_executable(ectool ectool.cc ${ECTOOL_COMMON_SOURCES})
 
@@ -53,37 +53,33 @@ endif()
 target_link_libraries(ectool ${libusb_LIBRARIES} ${libftdi1_LIBRARIES})
 
 # ============================
-# Add Shared Library : libectool.so
+# Add STATIC Library : libectool
 # ============================
+add_library(libectool STATIC libectool.cc ${ECTOOL_COMMON_SOURCES})
 
-set(LIBECTOOL_SOURCES ${ECTOOL_COMMON_SOURCES} libectool.cc)
+target_include_directories(libectool PUBLIC ../include ${libusb_INCLUDE_DIRS})
 
-add_library(libectool SHARED ${LIBECTOOL_SOURCES})
-
-target_include_directories(libectool PRIVATE ../include ${libusb_INCLUDE_DIRS})
-
-target_compile_definitions(libectool PRIVATE CHROMIUM_EC EXTERNAL_ECTOOL_BUILD)
+target_compile_definitions(libectool PUBLIC CHROMIUM_EC EXTERNAL_ECTOOL_BUILD)
 
 target_compile_options(
-  libectool PRIVATE -Wno-c99-designator -Wno-address-of-packed-member
-                    -Wno-format-security)
+  libectool PUBLIC -Wno-c99-designator -Wno-address-of-packed-member
+                   -Wno-format-security)
 
-target_link_libraries(libectool PRIVATE ${libusb_LIBRARIES}
-                                        ${libftdi1_LIBRARIES})
+target_link_libraries(libectool PUBLIC ${libusb_LIBRARIES}
+                                       ${libftdi1_LIBRARIES})
 
 if(WIN32)
-  target_compile_definitions(ectool PRIVATE _CRT_SECURE_NO_WARNINGS)
-  target_link_libraries(ectool PRIVATE getopt CrosECDriver
-                                       onecoreuap_apiset.lib)
+  target_compile_definitions(libectool PUBLIC _CRT_SECURE_NO_WARNINGS)
+  target_link_libraries(libectool PUBLIC getopt CrosECDriver
+                                         onecoreuap_apiset.lib)
   if(MSVC)
-    target_compile_options(ectool PRIVATE /FI"..\\include\\win32_shim.h")
+    target_compile_options(libectool PUBLIC /FI"..\\include\\win32_shim.h")
   else()
-    target_compile_options(ectool PRIVATE -include "..\\include\\win32_shim.h")
+    target_compile_options(libectool PUBLIC -include
+                                            "..\\include\\win32_shim.h")
   endif()
-  target_include_directories(ectool PRIVATE ../include/win32)
+  target_include_directories(libectool PUBLIC ../include/win32)
 endif()
 
-set_target_properties(
-  libectool PROPERTIES OUTPUT_NAME "ectool" # Generates `libectool.so` or
-                                            # `libectool.dll`
-)
+set_target_properties(libectool PROPERTIES OUTPUT_NAME ectool
+                                           POSITION_INDEPENDENT_CODE ON)

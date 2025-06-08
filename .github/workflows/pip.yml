@@ -43,4 +43,6 @@ jobs:
 
     - name: Test import
       run: |
-        python -c "import pyectool; print('pyectool imported')"
+        mkdir /tmp/testenv
+        cd /tmp/testenv
+        python -c "import pyectool; print('pyectool import successful')"

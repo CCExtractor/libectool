@@ -1,33 +1,46 @@
-# libectool  
+# Pyectool
 
-libectool is a shared library extracted from ectool, providing programmatic access to Embedded Controller (EC) functionalities on ChromeOS and compatible devices.  
+**Pyectool** is a Python package with C++ bindings for interacting with the Embedded Controller (EC) on ChromeOS and Framework devices. It is extracted from and based on [`ectool`](https://gitlab.howett.net/DHowett/ectool) utility, and exposes EC control functions directly to Python programs via a native extension.
 
-## Features  
-- Exposes EC control functions via a shared library (`libectool.so`).  
-- Supports fan control, battery management, temperature monitoring, and more.  
-- Designed for integration into other applications.  
+## Features
 
-## Build Instructions  
+- Python bindings for EC functionality using `pybind11`.
+- Supports fan duty control, temperature reading, AC power status, and more.
+- Designed for integration with hardware management or fan control tools.
+- Shared core logic with `libectool` for C/C++ integration.
+
+---
+
+## 🛠️ Build & Install (Python Package)
+
+We use [`scikit-build-core`](https://scikit-build-core.readthedocs.io/en/latest/) to build the C++ extension via CMake.
+
+### Prerequisites
+
+Install the required system dependencies:
+
 ```sh
+sudo apt update
+sudo apt install -y libusb-1.0-0-dev libftdi1-dev pkg-config
+````
+### Clone the repository and switch to the Python package branch
+
+```sh
+git clone --branch dev_py_pkg_build https://github.com/AhmedYasserrr/libectool.git
 cd libectool
-mkdir build && cd build
-cmake ..
-cmake --build .
 ```
-##  Post Build Instructions
-After building, you need to move `libectool.so` to a library directory where it can be found by your system:
+### Install the package
+```sh
+python -m pip install --upgrade pip
+pip install build scikit-build-core pybind11
+pip install .
+```
 
-### Option 1 — User-specific (Recommended for non-root users)
+After installing, **do not run Python from the `libectool/` directory**, since it contains a `pyectool/` folder that may shadow the installed package.
+
+Instead, test from another location, e.g.:
+
 ```sh
-mkdir -p ~/.local/lib
-cp src/core/libectool.so ~/.local/lib/libectool.so
-export LD_LIBRARY_PATH="$HOME/.local/lib:$LD_LIBRARY_PATH"
-```
-To make it persistent across sessions, add the export to your shell configuration:
-```sh
-echo 'export LD_LIBRARY_PATH="$HOME/.local/lib:$LD_LIBRARY_PATH"' >> ~/.bashrc
-```
-### Option 2 — Global installation
-```sh
-sudo cp src/core/libectool.so /usr/local/lib/libectool.so
+cd ..
+python -c "import pyectool; print(pyectool.__version__)"
 ```

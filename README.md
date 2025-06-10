@@ -11,7 +11,7 @@
 
 ---
 
-## 🛠️ Build & Install (Python Package)
+## Build & Install (Python Package)
 
 We use [`scikit-build-core`](https://scikit-build-core.readthedocs.io/en/latest/) to build the C++ extension via CMake.
 
@@ -31,8 +31,6 @@ cd libectool
 ```
 ### Install the package
 ```sh
-python -m pip install --upgrade pip
-pip install build scikit-build-core pybind11
 pip install .
 ```
 

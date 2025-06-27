@@ -5,7 +5,7 @@ on:
   pull_request:
   push:
     branches:
-      - dev_py_pkg_build
+      - pyectool
 
 jobs:
   build:

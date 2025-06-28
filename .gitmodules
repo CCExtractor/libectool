@@ -1,3 +1,3 @@
-[submodule "extern/FrameworkWindowsUtils"]
-	path = extern/FrameworkWindowsUtils
-	url = https://github.com/DHowett/FrameworkWindowsUtils
+[submodule "src/extern/FrameworkWindowsUtils"]
+    path = src/extern/FrameworkWindowsUtils
+    url = https://github.com/DHowett/FrameworkWindowsUtils

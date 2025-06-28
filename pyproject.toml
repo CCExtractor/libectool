@@ -5,7 +5,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pyectool"
-version = "0.0.1"
+version = "0.1.0"
 description="Python bindings for ectool using pybind11, enabling seamless integration with other applications"
 readme = "README.md"
 authors = [

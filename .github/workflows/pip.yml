@@ -4,9 +4,7 @@ on:
   workflow_dispatch:
   pull_request:
   push:
-    branches:
-      - pyectool
-
+    branches: [main, dev]
 jobs:
   build:
     name: Build on ${{ matrix.platform }} with Python ${{ matrix.python-version }}

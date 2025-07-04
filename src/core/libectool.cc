@@ -89,31 +89,33 @@ void libectool_release()
 
 int read_mapped_temperature(int id)
 {
-    int rv;
+    int ret;
+    uint8_t val;
 
-    if (!read_mapped_mem8(EC_MEMMAP_THERMAL_VERSION)) {
-        /*
-         *  The temp_sensor_init() is not called, which implies no
-         * temp sensor is defined.
-         */
-        rv = EC_TEMP_SENSOR_NOT_PRESENT;
-    } else if (id < EC_TEMP_SENSOR_ENTRIES)
-        rv = read_mapped_mem8(EC_MEMMAP_TEMP_SENSOR + id);
-    else if (read_mapped_mem8(EC_MEMMAP_THERMAL_VERSION) >= 2)
-        rv = read_mapped_mem8(EC_MEMMAP_TEMP_SENSOR_B + id -
-                      EC_TEMP_SENSOR_ENTRIES);
-    else {
-        /* Sensor in second bank, but second bank isn't supported */
-        rv = EC_TEMP_SENSOR_NOT_PRESENT;
+    ret = ec_readmem(EC_MEMMAP_THERMAL_VERSION, sizeof(val), &val);
+    if (ret <= 0 || val == 0)
+        return EC_TEMP_SENSOR_NOT_PRESENT;
+
+    if (id < EC_TEMP_SENSOR_ENTRIES) {
+        ret = ec_readmem(EC_MEMMAP_TEMP_SENSOR + id, sizeof(val), &val);
+        return (ret <= 0) ? EC_TEMP_SENSOR_ERROR : val;
     }
-    return rv;
+
+    // Check if second bank is supported
+    if (val < 2)
+        return EC_TEMP_SENSOR_NOT_PRESENT;
+
+    ret = ec_readmem(
+        EC_MEMMAP_TEMP_SENSOR_B + id - EC_TEMP_SENSOR_ENTRIES,
+        sizeof(val), &val);
+    return (ret <= 0) ? EC_TEMP_SENSOR_ERROR : val;
 }
 
 // -----------------------------------------------------------------------------
 // Top-level endpoint functions
 // -----------------------------------------------------------------------------
 
-int is_on_ac(int *ac_present) {
+int ec_is_on_ac(int *ac_present) {
     int ret;
     uint8_t flags;
 
@@ -133,10 +135,10 @@ int is_on_ac(int *ac_present) {
 
     *ac_present = !!(flags & EC_BATT_FLAG_AC_PRESENT);
     libectool_release();
-    return EC_SUCCESS;
+    return 0;
 }
 
-int auto_fan_control() {
+int ec_auto_fan_control() {
     int ret = libectool_init();
     if (ret < 0)
         return EC_ERR_INIT;
@@ -146,10 +148,10 @@ int auto_fan_control() {
     libectool_release();
     if (ret < 0)
         return EC_ERR_EC_COMMAND;
-    return EC_SUCCESS;
+    return 0;
 }
 
-int set_fan_duty(int duty) {
+int ec_set_fan_duty(int duty) {
     if (duty < 0 || duty > 100)
         return EC_ERR_INVALID_PARAM;
 
@@ -165,10 +167,10 @@ int set_fan_duty(int duty) {
     libectool_release();
     if (ret < 0)
         return EC_ERR_EC_COMMAND;
-    return EC_SUCCESS
+    return 0;
 }
 
-int get_max_temperature(float *max_temp) {
+int ec_get_max_temperature(float *max_temp) {
     if (!max_temp)
         return EC_ERR_INVALID_PARAM;
 
@@ -200,10 +202,10 @@ int get_max_temperature(float *max_temp) {
     if (t < 0)
         return EC_ERR_READMEM;
     *max_temp = t;
-    return EC_SUCCESS;
+    return 0;
 }
 
-int get_max_non_battery_temperature(float *max_temp)
+int ec_get_max_non_battery_temperature(float *max_temp)
 {
     if (!max_temp)
         return EC_ERR_INVALID_PARAM;
@@ -238,5 +240,5 @@ int get_max_non_battery_temperature(float *max_temp)
     if (t < 0)
         return EC_ERR_READMEM;
     *max_temp = t;
-    return EC_SUCCESS;
+    return 0;
 }

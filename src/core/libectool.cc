@@ -49,21 +49,18 @@ int libectool_init()
         /* For non-USB alt interfaces, we need to acquire the GEC lock */
         if (!(interfaces & COMM_USB) &&
             acquire_gec_lock(GEC_LOCK_TIMEOUT_SECS) < 0) {
-            fprintf(stderr, "Could not acquire GEC lock.\n");
             return -1;
         }
         /* If the interface is set to USB, try that (no lock needed) */
         if (interfaces == COMM_USB) {
 #ifndef _WIN32
             if (comm_init_usb(vid, pid)) {
-                fprintf(stderr, "Couldn't find EC on USB.\n");
                 /* Release the lock if it was acquired */
                 release_gec_lock();
                 return -1;
             }
 #endif
         } else if (comm_init_alt(interfaces, device_name, i2c_bus)) {
-            fprintf(stderr, "Couldn't find EC\n");
             release_gec_lock();
             return -1;
         }
@@ -71,7 +68,6 @@ int libectool_init()
 
     /* Initialize ring buffers for sending/receiving EC commands */
     if (comm_init_buffer()) {
-        fprintf(stderr, "Couldn't initialize buffers\n");
         release_gec_lock();
         return -1;
     }
@@ -91,174 +87,158 @@ void libectool_release()
 #endif
 }
 
-static uint8_t read_mapped_mem8(uint8_t offset)
+int read_mapped_temperature(int id)
 {
     int ret;
     uint8_t val;
 
-    ret = ec_readmem(offset, sizeof(val), &val);
-    if (ret <= 0) {
-        fprintf(stderr, "failure in %s(): %d\n", __func__, ret);
-        exit(1);
-    }
-    return val;
-}
+    ret = ec_readmem(EC_MEMMAP_THERMAL_VERSION, sizeof(val), &val);
+    if (ret <= 0 || val == 0)
+        return EC_TEMP_SENSOR_NOT_PRESENT;
 
-int read_mapped_temperature(int id)
-{
-    int rv;
-
-    if (!read_mapped_mem8(EC_MEMMAP_THERMAL_VERSION)) {
-        /*
-         *  The temp_sensor_init() is not called, which implies no
-         * temp sensor is defined.
-         */
-        rv = EC_TEMP_SENSOR_NOT_PRESENT;
-    } else if (id < EC_TEMP_SENSOR_ENTRIES)
-        rv = read_mapped_mem8(EC_MEMMAP_TEMP_SENSOR + id);
-    else if (read_mapped_mem8(EC_MEMMAP_THERMAL_VERSION) >= 2)
-        rv = read_mapped_mem8(EC_MEMMAP_TEMP_SENSOR_B + id -
-                      EC_TEMP_SENSOR_ENTRIES);
-    else {
-        /* Sensor in second bank, but second bank isn't supported */
-        rv = EC_TEMP_SENSOR_NOT_PRESENT;
+    if (id < EC_TEMP_SENSOR_ENTRIES) {
+        ret = ec_readmem(EC_MEMMAP_TEMP_SENSOR + id, sizeof(val), &val);
+        return (ret <= 0) ? EC_TEMP_SENSOR_ERROR : val;
     }
-    return rv;
+
+    // Check if second bank is supported
+    if (val < 2)
+        return EC_TEMP_SENSOR_NOT_PRESENT;
+
+    ret = ec_readmem(
+        EC_MEMMAP_TEMP_SENSOR_B + id - EC_TEMP_SENSOR_ENTRIES,
+        sizeof(val), &val);
+    return (ret <= 0) ? EC_TEMP_SENSOR_ERROR : val;
 }
 
 // -----------------------------------------------------------------------------
 // Top-level endpoint functions
 // -----------------------------------------------------------------------------
 
-bool is_on_ac() {
-    if (libectool_init() < 0)
-        fprintf(stderr, "Failed initializing EC connection\n");
+int ec_is_on_ac(int *ac_present) {
+    int ret;
+    uint8_t flags;
 
-    uint8_t flags = read_mapped_mem8(EC_MEMMAP_BATT_FLAG);
-    bool ac_present = (flags & EC_BATT_FLAG_AC_PRESENT);
+    if (!ac_present)
+        return EC_ERR_INVALID_PARAM;
 
-    libectool_release();
+    ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
 
-    return ac_present;
-}
+    ret = ec_readmem(EC_MEMMAP_BATT_FLAG, sizeof(flags), &flags);
 
-void auto_fan_control() {
-    if (libectool_init() < 0)
-        fprintf(stderr, "Failed initializing EC connection\n");
-
-    int rv = ec_command(EC_CMD_THERMAL_AUTO_FAN_CTRL, 0, NULL, 0, NULL, 0);
-
-    if (rv < 0)
-        fprintf(stderr, "Failed to enable auto fan control\n");
-
-    libectool_release();
-}
-
-void set_fan_duty(int duty) {
-    if (libectool_init() < 0)
-        fprintf(stderr, "Failed initializing EC connection\n");
-
-    struct ec_params_pwm_set_fan_duty_v0 p_v0;
-    int rv;
-
-    if (duty < 0 || duty > 100) {
-        fprintf(stderr, "Error: Fan duty cycle must be between 0 and 100.\n");
-        return;
+    if (ret <= 0) {
+        libectool_release();
+        return EC_ERR_READMEM;
     }
 
-    p_v0.percent = duty;
-    rv = ec_command(EC_CMD_PWM_SET_FAN_DUTY, 0, &p_v0, sizeof(p_v0),
-            NULL, 0);
-    if (rv < 0)
-        fprintf(stderr, "Error: Can't set duty cycle\n");
-
+    *ac_present = !!(flags & EC_BATT_FLAG_AC_PRESENT);
     libectool_release();
+    return 0;
 }
 
-// Get the maximum temperature from all sensors
-float get_max_temperature() {
-    if (libectool_init() < 0)
-        fprintf(stderr, "Failed initializing EC connection\n");
+int ec_auto_fan_control() {
+    int ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
 
-    float max_temp = -1.0f;
+    ret = ec_command(EC_CMD_THERMAL_AUTO_FAN_CTRL, 0, NULL, 0, NULL, 0);
+
+    libectool_release();
+    if (ret < 0)
+        return EC_ERR_EC_COMMAND;
+    return 0;
+}
+
+int ec_set_fan_duty(int duty) {
+    if (duty < 0 || duty > 100)
+        return EC_ERR_INVALID_PARAM;
+
+    int ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
+
+    struct ec_params_pwm_set_fan_duty_v0 p_v0;
+    p_v0.percent = duty;
+    ret = ec_command(EC_CMD_PWM_SET_FAN_DUTY, 0, &p_v0, sizeof(p_v0),
+            NULL, 0);
+
+    libectool_release();
+    if (ret < 0)
+        return EC_ERR_EC_COMMAND;
+    return 0;
+}
+
+int ec_get_max_temperature(float *max_temp) {
+    if (!max_temp)
+        return EC_ERR_INVALID_PARAM;
+
+    int ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
+
+    float t = -1.0f;
     int mtemp, temp;
     int id;
 
     for (id = 0; id < EC_MAX_TEMP_SENSOR_ENTRIES; id++) {
         mtemp = read_mapped_temperature(id);
         switch (mtemp) {
-        case EC_TEMP_SENSOR_NOT_PRESENT:
-            break;
-        case EC_TEMP_SENSOR_ERROR:
-            fprintf(stderr, "Sensor %d error\n", id);
-            break;
-        case EC_TEMP_SENSOR_NOT_POWERED:
-            fprintf(stderr, "Sensor %d disabled\n", id);
-            break;
-        case EC_TEMP_SENSOR_NOT_CALIBRATED:
-            fprintf(stderr, "Sensor %d not calibrated\n",
-                id);
-            break;
-        default:
-            temp = K_TO_C(mtemp + EC_TEMP_SENSOR_OFFSET);
-        }
-
-        if (temp > max_temp) {
-            max_temp = temp;
+            case EC_TEMP_SENSOR_NOT_PRESENT:
+            case EC_TEMP_SENSOR_ERROR:
+            case EC_TEMP_SENSOR_NOT_POWERED:
+            case EC_TEMP_SENSOR_NOT_CALIBRATED:
+            continue;
+            default:
+                temp = K_TO_C(mtemp + EC_TEMP_SENSOR_OFFSET);
+                if (temp > t)
+                    t = temp;
         }
     }
+
     libectool_release();
-    return max_temp;
+
+    if (t < 0)
+        return EC_ERR_READMEM;
+    *max_temp = t;
+    return 0;
 }
 
-float get_max_non_battery_temperature()
+int ec_get_max_non_battery_temperature(float *max_temp)
 {
-    if (libectool_init() < 0)
-        fprintf(stderr, "Failed initializing EC connection\n");
+    if (!max_temp)
+        return EC_ERR_INVALID_PARAM;
+
+    int ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
 
     struct ec_params_temp_sensor_get_info p;
     struct ec_response_temp_sensor_get_info r;
-    int rv;
-    float max_temp = -1.0f;
+    float t = -1.0f;
     int mtemp, temp;
-    int id;
 
     for (p.id = 0; p.id < EC_MAX_TEMP_SENSOR_ENTRIES; p.id++) {
-        if (read_mapped_temperature(p.id) == EC_TEMP_SENSOR_NOT_PRESENT)
+        mtemp = read_mapped_temperature(p.id);
+        if (mtemp < 0)
             continue;
-        rv = ec_command(EC_CMD_TEMP_SENSOR_GET_INFO, 0, &p,
+        ret = ec_command(EC_CMD_TEMP_SENSOR_GET_INFO, 0, &p,
                 sizeof(p), &r, sizeof(r));
-        if (rv < 0)
+        if (ret < 0)
             continue;
 
-        printf("%d: %d %s\n", p.id, r.sensor_type,
-               r.sensor_name);
-
-        if(strcmp(r.sensor_name, "Battery")){ // not eqaul to battery
-            mtemp = read_mapped_temperature(p.id);
-            switch (mtemp) {
-                case EC_TEMP_SENSOR_NOT_PRESENT:
-                    break;
-                case EC_TEMP_SENSOR_ERROR:
-                    fprintf(stderr, "Sensor %d error\n", id);
-                    break;
-                case EC_TEMP_SENSOR_NOT_POWERED:
-                    fprintf(stderr, "Sensor %d disabled\n", id);
-                    break;
-                case EC_TEMP_SENSOR_NOT_CALIBRATED:
-                    fprintf(stderr, "Sensor %d not calibrated\n",
-                        id);
-                    break;
-                default:
-                    temp = K_TO_C(mtemp + EC_TEMP_SENSOR_OFFSET);
-                }
+        if(strcmp(r.sensor_name, "Battery")){
             temp = K_TO_C(mtemp + EC_TEMP_SENSOR_OFFSET);
-            if (temp > max_temp) {
-                max_temp = temp;
-            }
+            if (temp > t)
+                t = temp;
         }
     }
 
     libectool_release();
-    return max_temp;
+
+    if (t < 0)
+        return EC_ERR_READMEM;
+    *max_temp = t;
+    return 0;
 }

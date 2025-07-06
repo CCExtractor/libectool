@@ -112,7 +112,7 @@ int read_mapped_temperature(int id)
 }
 
 // -----------------------------------------------------------------------------
-// Top-level endpoint functions
+// Top-level Power Functions
 // -----------------------------------------------------------------------------
 
 int ec_is_on_ac(int *ac_present) {
@@ -137,6 +137,10 @@ int ec_is_on_ac(int *ac_present) {
     libectool_release();
     return 0;
 }
+
+// -----------------------------------------------------------------------------
+// Top-level fan control Functions
+// -----------------------------------------------------------------------------
 
 int ec_auto_fan_control() {
     int ret = libectool_init();
@@ -169,6 +173,131 @@ int ec_set_fan_duty(int duty) {
         return EC_ERR_EC_COMMAND;
     return 0;
 }
+
+int ec_set_fan_rpm(int target_rpm, int fan_idx) {
+    int ret, cmdver;
+    int num_fans;
+    struct ec_params_pwm_set_fan_target_rpm_v1 p_v1;
+
+    if (target_rpm < 0)
+        return EC_ERR_INVALID_PARAM;
+
+    ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
+
+    num_fans = get_num_fans();
+
+    if (fan_idx < 0 || fan_idx >= num_fans) {
+        libectool_release();
+        return EC_ERR_INVALID_PARAM;
+    }
+
+    cmdver = 1;
+
+    if (!ec_cmd_version_supported(EC_CMD_PWM_SET_FAN_TARGET_RPM, cmdver)) {
+        libectool_release();
+        return EC_ERR_UNSUPPORTED_VER;
+    }
+
+    p_v1.fan_idx = fan_idx;
+    p_v1.rpm = target_rpm;
+
+    ret = ec_command(EC_CMD_PWM_SET_FAN_TARGET_RPM, cmdver,
+                     &p_v1, sizeof(p_v1), NULL, 0);
+    libectool_release();
+
+    return (ret < 0) ? EC_ERR_EC_COMMAND : 0;
+}
+
+int ec_set_all_fan_rpm(int target_rpm) {
+    int ret;
+    struct ec_params_pwm_set_fan_target_rpm_v0 p_v0;
+
+    if (target_rpm < 0)
+        return EC_ERR_INVALID_PARAM;
+
+    ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
+
+    p_v0.rpm = target_rpm;
+
+    ret = ec_command(EC_CMD_PWM_SET_FAN_TARGET_RPM, 0,
+                     &p_v0, sizeof(p_v0), NULL, 0);
+
+    libectool_release();
+    return (ret < 0) ? EC_ERR_EC_COMMAND : 0;
+}
+
+int ec_get_fan_rpm(int *rpm, int fan_idx) {
+    int ret, num_fans;
+    struct ec_params_pwm_get_fan_rpm p;
+    struct ec_response_pwm_get_fan_rpm r;
+
+    if (!rpm)
+        return EC_ERR_INVALID_PARAM;
+
+    ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
+
+    num_fans = get_num_fans();
+
+    if (fan_idx < 0 || fan_idx >= num_fans) {
+        libectool_release();
+        return EC_ERR_INVALID_PARAM;
+    }
+
+    p.fan_idx = fan_idx;
+
+    ret = ec_command(EC_CMD_PWM_GET_FAN_RPM, 0,
+                     &p, sizeof(p),
+                     &r, sizeof(r));
+    libectool_release();
+
+    if (ret < 0)
+        return EC_ERR_EC_COMMAND;
+
+    *rpm = r.rpm;
+    return 0;
+}
+
+int ec_get_all_fan_rpm(int *rpms, int max_fans, int *num_fans_out) {
+    int i, ret, num_fans;
+
+    if (!rpms || !num_fans_out)
+        return EC_ERR_INVALID_PARAM;
+
+    ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
+
+    num_fans = get_num_fans();
+    *num_fans_out = num_fans;
+
+    for (i = 0; i < num_fans && i < max_fans; i++) {
+        struct ec_params_pwm_get_fan_rpm p;
+        struct ec_response_pwm_get_fan_rpm r;
+
+        p.fan_idx = i;
+        ret = ec_command(EC_CMD_PWM_GET_FAN_RPM, 0,
+                         &p, sizeof(p),
+                         &r, sizeof(r));
+        if (ret < 0) {
+            libectool_release();
+            return EC_ERR_EC_COMMAND;
+        }
+        rpms[i] = r.rpm;
+    }
+
+    libectool_release();
+    return 0;
+}
+
+// -----------------------------------------------------------------------------
+// Top-level temperature Functions
+// -----------------------------------------------------------------------------
 
 int ec_get_max_temperature(float *max_temp) {
     if (!max_temp)

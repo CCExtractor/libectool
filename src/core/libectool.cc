@@ -112,6 +112,35 @@ int read_mapped_temperature(int id)
 }
 
 // -----------------------------------------------------------------------------
+// Top-level General Functions
+// -----------------------------------------------------------------------------
+int ec_hello() {
+    int ret;
+    struct ec_params_hello p;
+    struct ec_response_hello r;
+
+    ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
+
+    p.in_data = 0xa0b0c0d0;
+
+    ret = ec_command(EC_CMD_HELLO, 0,
+                     &p, sizeof(p),
+                     &r, sizeof(r));
+    libectool_release();
+
+    if (ret < 0)
+        return EC_ERR_EC_COMMAND;
+
+    if (r.out_data != 0xa1b2c3d4) {
+        return EC_ERR_INVALID_RESPONSE;
+    }
+
+    return 0;
+}
+
+// -----------------------------------------------------------------------------
 // Top-level Power Functions
 // -----------------------------------------------------------------------------
 
@@ -142,36 +171,108 @@ int ec_is_on_ac(int *ac_present) {
 // Top-level fan control Functions
 // -----------------------------------------------------------------------------
 
-int ec_auto_fan_control() {
-    int ret = libectool_init();
+int ec_enable_fan_auto_ctrl(int fan_idx) {
+    int ret, cmdver;
+    int num_fans;
+    struct ec_params_auto_fan_ctrl_v1 p_v1;
+
+    ret = libectool_init();
     if (ret < 0)
         return EC_ERR_INIT;
 
-    ret = ec_command(EC_CMD_THERMAL_AUTO_FAN_CTRL, 0, NULL, 0, NULL, 0);
+    cmdver = 1;
 
+    if (!ec_cmd_version_supported(EC_CMD_THERMAL_AUTO_FAN_CTRL, cmdver)) {
+        libectool_release();
+        return EC_ERR_UNSUPPORTED_VER;
+    }
+
+    num_fans = get_num_fans();
+    if (fan_idx < 0 || fan_idx >= num_fans) {
+        libectool_release();
+        return EC_ERR_INVALID_PARAM;
+    }
+
+    p_v1.fan_idx = fan_idx;
+
+    ret = ec_command(EC_CMD_THERMAL_AUTO_FAN_CTRL, cmdver,
+                     &p_v1, sizeof(p_v1),
+                     NULL, 0);
     libectool_release();
-    if (ret < 0)
-        return EC_ERR_EC_COMMAND;
-    return 0;
+
+    return (ret < 0) ? EC_ERR_EC_COMMAND : 0;
 }
 
-int ec_set_fan_duty(int duty) {
-    if (duty < 0 || duty > 100)
-        return EC_ERR_INVALID_PARAM;
+int ec_enable_all_fans_auto_ctrl() {
+    int ret;
 
-    int ret = libectool_init();
+    ret = libectool_init();
     if (ret < 0)
         return EC_ERR_INIT;
 
-    struct ec_params_pwm_set_fan_duty_v0 p_v0;
-    p_v0.percent = duty;
-    ret = ec_command(EC_CMD_PWM_SET_FAN_DUTY, 0, &p_v0, sizeof(p_v0),
-            NULL, 0);
+    ret = ec_command(EC_CMD_THERMAL_AUTO_FAN_CTRL, 0,
+                     NULL, 0,
+                     NULL, 0);
+    libectool_release();
+
+    return (ret < 0) ? EC_ERR_EC_COMMAND : 0;
+}
+
+int ec_set_fan_duty(int percent, int fan_idx) {
+    int ret, cmdver;
+    int num_fans;
+    struct ec_params_pwm_set_fan_duty_v1 p_v1;
+
+    if (percent < 0 || percent > 100)
+        return EC_ERR_INVALID_PARAM;
+
+    ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
+
+    num_fans = get_num_fans();
+    if (fan_idx < 0 || fan_idx >= num_fans) {
+        libectool_release();
+        return EC_ERR_INVALID_PARAM;
+    }
+
+    cmdver = 1;
+
+    if (!ec_cmd_version_supported(EC_CMD_PWM_SET_FAN_DUTY, cmdver)) {
+        libectool_release();
+        return EC_ERR_UNSUPPORTED_VER;
+    }
+
+    p_v1.fan_idx = fan_idx;
+    p_v1.percent = percent;
+
+    ret = ec_command(EC_CMD_PWM_SET_FAN_DUTY, cmdver,
+                     &p_v1, sizeof(p_v1), NULL, 0);
 
     libectool_release();
+
+    return (ret < 0) ? EC_ERR_EC_COMMAND : 0;
+}
+
+int ec_set_all_fans_duty(int percent) {
+    int ret;
+    struct ec_params_pwm_set_fan_duty_v0 p_v0;
+
+    if (percent < 0 || percent > 100)
+        return EC_ERR_INVALID_PARAM;
+
+    ret = libectool_init();
     if (ret < 0)
-        return EC_ERR_EC_COMMAND;
-    return 0;
+        return EC_ERR_INIT;
+
+    p_v0.percent = percent;
+
+    ret = ec_command(EC_CMD_PWM_SET_FAN_DUTY, 0,
+                     &p_v0, sizeof(p_v0), NULL, 0);
+
+    libectool_release();
+
+    return (ret < 0) ? EC_ERR_EC_COMMAND : 0;
 }
 
 int ec_set_fan_rpm(int target_rpm, int fan_idx) {
@@ -210,7 +311,7 @@ int ec_set_fan_rpm(int target_rpm, int fan_idx) {
     return (ret < 0) ? EC_ERR_EC_COMMAND : 0;
 }
 
-int ec_set_all_fan_rpm(int target_rpm) {
+int ec_set_all_fans_rpm(int target_rpm) {
     int ret;
     struct ec_params_pwm_set_fan_target_rpm_v0 p_v0;
 
@@ -263,7 +364,7 @@ int ec_get_fan_rpm(int *rpm, int fan_idx) {
     return 0;
 }
 
-int ec_get_all_fan_rpm(int *rpms, int max_fans, int *num_fans_out) {
+int ec_get_all_fans_rpm(int *rpms, int rpms_size, int *num_fans_out) {
     int i, ret, num_fans;
 
     if (!rpms || !num_fans_out)
@@ -276,7 +377,7 @@ int ec_get_all_fan_rpm(int *rpms, int max_fans, int *num_fans_out) {
     num_fans = get_num_fans();
     *num_fans_out = num_fans;
 
-    for (i = 0; i < num_fans && i < max_fans; i++) {
+    for (i = 0; i < num_fans && i < rpms_size; i++) {
         struct ec_params_pwm_get_fan_rpm p;
         struct ec_response_pwm_get_fan_rpm r;
 
@@ -299,7 +400,67 @@ int ec_get_all_fan_rpm(int *rpms, int max_fans, int *num_fans_out) {
 // Top-level temperature Functions
 // -----------------------------------------------------------------------------
 
-int ec_get_max_temperature(float *max_temp) {
+int ec_get_temp(int sensor_idx, int *temp_out) {
+    int mtemp, ret;
+
+    if (!temp_out || sensor_idx < 0 || sensor_idx >= EC_MAX_TEMP_SENSOR_ENTRIES)
+        return EC_ERR_INVALID_PARAM;
+
+    ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
+
+    mtemp = read_mapped_temperature(sensor_idx);
+
+    switch (mtemp) {
+        case EC_TEMP_SENSOR_NOT_PRESENT:
+        case EC_TEMP_SENSOR_ERROR:
+        case EC_TEMP_SENSOR_NOT_POWERED:
+        case EC_TEMP_SENSOR_NOT_CALIBRATED:
+            return EC_ERR_SENSOR_UNAVAILABLE;
+        default:
+            mtemp = K_TO_C(mtemp + EC_TEMP_SENSOR_OFFSET);
+    }
+
+    libectool_release();
+
+    if (mtemp < 0)
+        return EC_ERR_READMEM;
+    *temp_out = mtemp;
+
+    return 0;
+}
+
+int ec_get_all_temps(int *temps_out, int max_len, int *num_sensors_out) {
+    int id, mtemp, ret;
+    int count = 0;
+
+    if (!temps_out || max_len < EC_MAX_TEMP_SENSOR_ENTRIES)
+        return EC_ERR_INVALID_PARAM;
+
+    ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
+
+    for (id = 0; id < EC_MAX_TEMP_SENSOR_ENTRIES; id++) {
+        mtemp = read_mapped_temperature(id);
+        if (mtemp >= 0) {
+            temps_out[id] = K_TO_C(mtemp + EC_TEMP_SENSOR_OFFSET);
+            count++;
+        } else {
+            temps_out[id] = -1;
+        }
+    }
+
+    libectool_release();
+
+    if (num_sensors_out)
+        *num_sensors_out = count;
+
+    return 0;
+}
+
+int ec_get_max_temp(int *max_temp) {
     if (!max_temp)
         return EC_ERR_INVALID_PARAM;
 
@@ -307,7 +468,7 @@ int ec_get_max_temperature(float *max_temp) {
     if (ret < 0)
         return EC_ERR_INIT;
 
-    float t = -1.0f;
+    int t = -1;
     int mtemp, temp;
     int id;
 
@@ -334,7 +495,7 @@ int ec_get_max_temperature(float *max_temp) {
     return 0;
 }
 
-int ec_get_max_non_battery_temperature(float *max_temp)
+int ec_get_max_non_battery_temp(int *max_temp)
 {
     if (!max_temp)
         return EC_ERR_INVALID_PARAM;
@@ -345,7 +506,7 @@ int ec_get_max_non_battery_temperature(float *max_temp)
 
     struct ec_params_temp_sensor_get_info p;
     struct ec_response_temp_sensor_get_info r;
-    float t = -1.0f;
+    int t = -1;
     int mtemp, temp;
 
     for (p.id = 0; p.id < EC_MAX_TEMP_SENSOR_ENTRIES; p.id++) {
@@ -369,5 +530,58 @@ int ec_get_max_non_battery_temperature(float *max_temp)
     if (t < 0)
         return EC_ERR_READMEM;
     *max_temp = t;
+    return 0;
+}
+
+int ec_get_temp_info(int sensor_idx, struct ec_temp_info *info_out) {
+    struct ec_response_temp_sensor_get_info temp_r;
+    struct ec_params_temp_sensor_get_info temp_p;
+    struct ec_params_thermal_get_threshold_v1 thresh_p;
+    struct ec_thermal_config thresh_r;
+    int mtemp;
+    int rc;
+
+    if (!info_out || sensor_idx < 0 || sensor_idx >= EC_MAX_TEMP_SENSOR_ENTRIES)
+        return EC_ERR_INVALID_PARAM;
+
+    int ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
+
+    // Check whether the sensor exists:
+    mtemp = read_mapped_temperature(sensor_idx);
+    if (mtemp < 0)
+        return EC_ERR_SENSOR_UNAVAILABLE;
+
+    // Get sensor info (name, type)
+    temp_p.id = sensor_idx;
+    rc = ec_command(EC_CMD_TEMP_SENSOR_GET_INFO, 0,
+                    &temp_p, sizeof(temp_p),
+                    &temp_r, sizeof(temp_r));
+    if (rc < 0)
+        return EC_ERR_EC_COMMAND;
+
+    strncpy(info_out->sensor_name, temp_r.sensor_name,
+            sizeof(info_out->sensor_name) - 1);
+    info_out->sensor_name[sizeof(info_out->sensor_name) - 1] = '\0';
+
+    info_out->sensor_type = temp_r.sensor_type;
+
+    info_out->temp = K_TO_C(mtemp + EC_TEMP_SENSOR_OFFSET);
+
+    thresh_p.sensor_num = sensor_idx;
+    rc = ec_command(EC_CMD_THERMAL_GET_THRESHOLD, 1,
+                    &thresh_p, sizeof(thresh_p),
+                    &thresh_r, sizeof(thresh_r));
+    if (rc < 0) {
+        // Could not read thresholds. Fill with -1 as invalid values.
+        info_out->temp_fan_off = -1;
+        info_out->temp_fan_max = -1;
+    } else {
+        info_out->temp_fan_off = K_TO_C(thresh_r.temp_fan_off);
+        info_out->temp_fan_max = K_TO_C(thresh_r.temp_fan_max);
+    }
+
+    libectool_release();
     return 0;
 }

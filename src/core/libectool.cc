@@ -171,6 +171,36 @@ int ec_is_on_ac(int *ac_present) {
 // Top-level fan control Functions
 // -----------------------------------------------------------------------------
 
+int ec_get_num_fans(int *val) {
+    int ret, fan_val, idx;
+    struct ec_response_get_features r;
+
+    if (!val)
+        return EC_ERR_INVALID_PARAM;
+
+    ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
+
+    ret = ec_command(EC_CMD_GET_FEATURES, 0, NULL, 0, &r, sizeof(r));
+    if (ret >= 0 && !(r.flags[0] & BIT(EC_FEATURE_PWM_FAN)))
+        *val = 0;
+
+    for (idx = 0; idx < EC_FAN_SPEED_ENTRIES; idx++) {
+        ret = ec_readmem(EC_MEMMAP_FAN + 2 * idx, sizeof(fan_val), &fan_val);
+
+        if (ret <= 0)
+            return EC_ERR_READMEM;
+
+        if (fan_val == EC_FAN_SPEED_NOT_PRESENT)
+            break;
+    }
+
+    *val = idx;
+    libectool_release();
+    return 0;
+}
+
 int ec_enable_fan_auto_ctrl(int fan_idx) {
     int ret, cmdver;
     int num_fans;
@@ -187,7 +217,8 @@ int ec_enable_fan_auto_ctrl(int fan_idx) {
         return EC_ERR_UNSUPPORTED_VER;
     }
 
-    num_fans = get_num_fans();
+    ec_get_num_fans(&num_fans);
+
     if (fan_idx < 0 || fan_idx >= num_fans) {
         libectool_release();
         return EC_ERR_INVALID_PARAM;
@@ -230,7 +261,7 @@ int ec_set_fan_duty(int percent, int fan_idx) {
     if (ret < 0)
         return EC_ERR_INIT;
 
-    num_fans = get_num_fans();
+    ec_get_num_fans(&num_fans);
     if (fan_idx < 0 || fan_idx >= num_fans) {
         libectool_release();
         return EC_ERR_INVALID_PARAM;
@@ -287,7 +318,7 @@ int ec_set_fan_rpm(int target_rpm, int fan_idx) {
     if (ret < 0)
         return EC_ERR_INIT;
 
-    num_fans = get_num_fans();
+    ec_get_num_fans(&num_fans);
 
     if (fan_idx < 0 || fan_idx >= num_fans) {
         libectool_release();
@@ -332,9 +363,7 @@ int ec_set_all_fans_rpm(int target_rpm) {
 }
 
 int ec_get_fan_rpm(int *rpm, int fan_idx) {
-    int ret, num_fans;
-    struct ec_params_pwm_get_fan_rpm p;
-    struct ec_response_pwm_get_fan_rpm r;
+    int ret, val, num_fans;
 
     if (!rpm)
         return EC_ERR_INVALID_PARAM;
@@ -343,29 +372,34 @@ int ec_get_fan_rpm(int *rpm, int fan_idx) {
     if (ret < 0)
         return EC_ERR_INIT;
 
-    num_fans = get_num_fans();
+    ec_get_num_fans(&num_fans);
 
     if (fan_idx < 0 || fan_idx >= num_fans) {
         libectool_release();
         return EC_ERR_INVALID_PARAM;
     }
 
-    p.fan_idx = fan_idx;
+    ret = ec_readmem(EC_MEMMAP_FAN + 2 * fan_idx, sizeof(val), &val);
+    if (ret <= 0)
+        return EC_ERR_READMEM;
 
-    ret = ec_command(EC_CMD_PWM_GET_FAN_RPM, 0,
-                     &p, sizeof(p),
-                     &r, sizeof(r));
+    switch (val) {
+        case EC_FAN_SPEED_NOT_PRESENT:
+            val = -1;
+            break;
+        case EC_FAN_SPEED_STALLED:
+            val = -2;
+            break;
+    }
+
     libectool_release();
 
-    if (ret < 0)
-        return EC_ERR_EC_COMMAND;
-
-    *rpm = r.rpm;
+    *rpm = val;
     return 0;
 }
 
 int ec_get_all_fans_rpm(int *rpms, int rpms_size, int *num_fans_out) {
-    int i, ret, num_fans;
+    int i, ret, val, num_fans;
 
     if (!rpms || !num_fans_out)
         return EC_ERR_INVALID_PARAM;
@@ -374,22 +408,23 @@ int ec_get_all_fans_rpm(int *rpms, int rpms_size, int *num_fans_out) {
     if (ret < 0)
         return EC_ERR_INIT;
 
-    num_fans = get_num_fans();
+    ec_get_num_fans(&num_fans);
     *num_fans_out = num_fans;
 
     for (i = 0; i < num_fans && i < rpms_size; i++) {
-        struct ec_params_pwm_get_fan_rpm p;
-        struct ec_response_pwm_get_fan_rpm r;
+        ret = ec_readmem(EC_MEMMAP_FAN + 2 * i, sizeof(val), &val);
+        if (ret <= 0)
+            return EC_ERR_READMEM;
 
-        p.fan_idx = i;
-        ret = ec_command(EC_CMD_PWM_GET_FAN_RPM, 0,
-                         &p, sizeof(p),
-                         &r, sizeof(r));
-        if (ret < 0) {
-            libectool_release();
-            return EC_ERR_EC_COMMAND;
+        switch (val) {
+            case EC_FAN_SPEED_NOT_PRESENT:
+                val = -1;
+                break;
+            case EC_FAN_SPEED_STALLED:
+                val = -2;
+                break;
         }
-        rpms[i] = r.rpm;
+        rpms[i] = val;
     }
 
     libectool_release();
@@ -399,6 +434,14 @@ int ec_get_all_fans_rpm(int *rpms, int rpms_size, int *num_fans_out) {
 // -----------------------------------------------------------------------------
 // Top-level temperature Functions
 // -----------------------------------------------------------------------------
+
+int ec_get_num_temp_entries(int *val) {
+    if (!val)
+        return EC_ERR_INVALID_PARAM;
+
+    *val = EC_MAX_TEMP_SENSOR_ENTRIES;
+    return 0;
+}
 
 int ec_get_temp(int sensor_idx, int *temp_out) {
     int mtemp, ret;

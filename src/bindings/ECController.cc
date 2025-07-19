@@ -88,9 +88,9 @@ std::vector<int> ECController::get_all_fans_rpm() {
 // -----------------------------------------------------------------------------
 // Top-level temperature Functions
 // -----------------------------------------------------------------------------
-int ECController::get_num_temp_entries() {
+int ECController::get_num_temp_sensors() {
     int val = 0;
-    int ret = ec_get_num_temp_entries(&val);
+    int ret = ec_get_num_temp_sensors(&val);
     handle_error(ret, "Failed to get number of temp sensors");
     return val;
 }
@@ -103,12 +103,13 @@ int ECController::get_temp(int sensor_idx) {
 }
 
 std::vector<int> ECController::get_all_temps() {
-    int max_entries = get_num_temp_entries();
+    int max_entries = get_num_temp_sensors();
     std::vector<int> temps(max_entries);
     int num_sensors = 0;
 
     int ret = ec_get_all_temps(temps.data(), max_entries, &num_sensors);
     handle_error(ret, "Failed to get all temperatures");
+    temps.resize(num_sensors);  // Trim unused entries
     return temps;
 }
 

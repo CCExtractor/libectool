@@ -69,8 +69,8 @@ PYBIND11_MODULE(libectool_py, m) {
             },
             "Get all fans RPM as list")
 
-        .def("get_num_temp_entries",
-             &ECController::get_num_temp_entries,
+        .def("get_num_temp_sensors",
+             &ECController::get_num_temp_sensors,
              "Get number of temperature sensors")
 
         .def("get_temp",

@@ -18,7 +18,7 @@ public:
     int get_fan_rpm(int fan_idx);
     std::vector<int> get_all_fans_rpm();
 
-    int get_num_temp_entries();
+    int get_num_temp_sensors();
     int get_temp(int sensor_idx);
     std::vector<int> get_all_temps();
     int get_max_temp();

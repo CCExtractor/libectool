@@ -172,7 +172,8 @@ int ec_is_on_ac(int *ac_present) {
 // -----------------------------------------------------------------------------
 
 int ec_get_num_fans(int *val) {
-    int ret, fan_val, idx;
+    int ret, idx;
+    uint16_t fan_val;
     struct ec_response_get_features r;
 
     if (!val)
@@ -191,8 +192,8 @@ int ec_get_num_fans(int *val) {
 
         if (ret <= 0)
             return EC_ERR_READMEM;
-
-        if (fan_val == EC_FAN_SPEED_NOT_PRESENT)
+        
+        if ((int)fan_val == EC_FAN_SPEED_NOT_PRESENT)
             break;
     }
 
@@ -363,7 +364,8 @@ int ec_set_all_fans_rpm(int target_rpm) {
 }
 
 int ec_get_fan_rpm(int *rpm, int fan_idx) {
-    int ret, val, num_fans;
+    int ret, num_fans;
+    uint16_t val;
 
     if (!rpm)
         return EC_ERR_INVALID_PARAM;
@@ -385,21 +387,22 @@ int ec_get_fan_rpm(int *rpm, int fan_idx) {
 
     switch (val) {
         case EC_FAN_SPEED_NOT_PRESENT:
-            val = -1;
+            *rpm = -1;
             break;
         case EC_FAN_SPEED_STALLED:
-            val = -2;
+            *rpm = -2;
             break;
+        default:
+            *rpm = val;
     }
 
     libectool_release();
-
-    *rpm = val;
     return 0;
 }
 
 int ec_get_all_fans_rpm(int *rpms, int rpms_size, int *num_fans_out) {
-    int i, ret, val, num_fans;
+    int i, ret, num_fans;
+    uint16_t val;
 
     if (!rpms || !num_fans_out)
         return EC_ERR_INVALID_PARAM;
@@ -418,13 +421,15 @@ int ec_get_all_fans_rpm(int *rpms, int rpms_size, int *num_fans_out) {
 
         switch (val) {
             case EC_FAN_SPEED_NOT_PRESENT:
-                val = -1;
+                rpms[i] = -1;
                 break;
             case EC_FAN_SPEED_STALLED:
-                val = -2;
+                rpms[i] = -2;
                 break;
+            default:
+                rpms[i] = val;
         }
-        rpms[i] = val;
+        
     }
 
     libectool_release();
@@ -434,12 +439,34 @@ int ec_get_all_fans_rpm(int *rpms, int rpms_size, int *num_fans_out) {
 // -----------------------------------------------------------------------------
 // Top-level temperature Functions
 // -----------------------------------------------------------------------------
+int ec_get_num_temp_sensors(int *val) {
+    int id, mtemp, ret;
+    int count = 0;
 
-int ec_get_num_temp_entries(int *val) {
     if (!val)
         return EC_ERR_INVALID_PARAM;
 
-    *val = EC_MAX_TEMP_SENSOR_ENTRIES;
+    ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
+
+    for (id = 0; id < EC_MAX_TEMP_SENSOR_ENTRIES; id++) {
+        mtemp = read_mapped_temperature(id);
+
+        switch (mtemp) {
+        case EC_TEMP_SENSOR_NOT_PRESENT:
+        case EC_TEMP_SENSOR_ERROR:
+        case EC_TEMP_SENSOR_NOT_POWERED:
+        case EC_TEMP_SENSOR_NOT_CALIBRATED:
+            continue;
+        default:
+            count++;
+        }
+    }
+
+    libectool_release();
+
+    *val = count;
     return 0;
 }
 
@@ -478,7 +505,7 @@ int ec_get_all_temps(int *temps_out, int max_len, int *num_sensors_out) {
     int id, mtemp, ret;
     int count = 0;
 
-    if (!temps_out || max_len < EC_MAX_TEMP_SENSOR_ENTRIES)
+    if (!temps_out)
         return EC_ERR_INVALID_PARAM;
 
     ret = libectool_init();
@@ -487,11 +514,16 @@ int ec_get_all_temps(int *temps_out, int max_len, int *num_sensors_out) {
 
     for (id = 0; id < EC_MAX_TEMP_SENSOR_ENTRIES; id++) {
         mtemp = read_mapped_temperature(id);
-        if (mtemp >= 0) {
-            temps_out[id] = K_TO_C(mtemp + EC_TEMP_SENSOR_OFFSET);
+
+        switch (mtemp) {
+        case EC_TEMP_SENSOR_NOT_PRESENT:
+        case EC_TEMP_SENSOR_ERROR:
+        case EC_TEMP_SENSOR_NOT_POWERED:
+        case EC_TEMP_SENSOR_NOT_CALIBRATED:
+            continue;
+        default:
+            temps_out[count] = K_TO_C(mtemp + EC_TEMP_SENSOR_OFFSET);
             count++;
-        } else {
-            temps_out[id] = -1;
         }
     }
 

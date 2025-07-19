@@ -1,6 +1,8 @@
 #pragma once
 #include <stdexcept>
 #include <string>
+#include <vector>
+#include "libectool.h"
 
 class ECController {
 public:

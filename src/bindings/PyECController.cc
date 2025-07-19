@@ -65,7 +65,7 @@ PYBIND11_MODULE(libectool_py, m) {
 
         .def("get_all_fans_rpm",
             [](ECController &self) {
-                return py::list(self.get_all_fans_rpm());
+                return py::cast(self.get_all_fans_rpm());
             },
             "Get all fans RPM as list")
 
@@ -80,7 +80,7 @@ PYBIND11_MODULE(libectool_py, m) {
 
         .def("get_all_temps",
             [](ECController &self) {
-                return py::list(self.get_all_temps());
+                return py::cast(self.get_all_temps());
             },
             "Get all temperature values as list")
 

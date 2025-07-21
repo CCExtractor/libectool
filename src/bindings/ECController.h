@@ -6,7 +6,10 @@
 
 class ECController {
 public:
+    int hello();
+
     bool is_on_ac();
+    ec_charge_state_info get_charge_state();
 
     int get_num_fans();
     void enable_fan_auto_ctrl(int fan_idx);

@@ -26,6 +26,11 @@ void ECController::handle_error(int code, const std::string &msg) {
     throw std::runtime_error(msg + " (" + reason + ", code " + std::to_string(code) + ")");
 }
 
+int ECController::hello() {
+    int ret = ec_hello();
+    return ret;
+}
+
 // -----------------------------------------------------------------------------
 // Top-level Power Functions
 // -----------------------------------------------------------------------------
@@ -35,6 +40,13 @@ bool ECController::is_on_ac() {
     int ret = ec_is_on_ac(&ac);
     handle_error(ret, "Failed to read AC status");
     return ac;
+}
+
+ec_charge_state_info ECController::get_charge_state() {
+    ec_charge_state_info info;
+    int ret = ec_get_charge_state(&info);
+    handle_error(ret, "Failed to get charge state");
+    return info;
 }
 
 // -----------------------------------------------------------------------------

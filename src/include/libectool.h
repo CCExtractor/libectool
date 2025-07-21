@@ -24,6 +24,14 @@ struct ec_temp_info {
     int temp_fan_max;
 };
 
+struct ec_charge_state_info {
+    int ac;
+    int chg_voltage;
+    int chg_current;
+    int chg_input_current;
+    int batt_state_of_charge;
+};
+
 // Library init/release
 int libectool_init();
 void libectool_release();
@@ -32,6 +40,7 @@ void libectool_release();
 int ec_hello();
 
 int ec_is_on_ac(int *ac_present);
+int ec_get_charge_state(struct ec_charge_state_info *info_out);
 
 int ec_get_num_fans(int *val);
 int ec_enable_fan_auto_ctrl(int fan_idx);

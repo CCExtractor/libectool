@@ -111,6 +111,43 @@ int read_mapped_temperature(int id)
     return (ret <= 0) ? EC_TEMP_SENSOR_ERROR : val;
 }
 
+// Charge state parameter count table
+#define ST_FLD_SIZE(ST, FLD) sizeof(((struct ST *)0)->FLD)
+#define ST_CMD_SIZE ST_FLD_SIZE(struct ec_params_charge_state, cmd)
+#define ST_PRM_SIZE(SUBCMD) (ST_CMD_SIZE + ST_FLD_SIZE(struct ec_params_charge_state, SUBCMD))
+#define ST_RSP_SIZE(SUBCMD) ST_FLD_SIZE(struct ec_response_charge_state, SUBCMD)
+
+static const struct {
+    uint8_t to_ec_size;
+    uint8_t from_ec_size;
+} cs_paramcount[] = {
+    [CHARGE_STATE_CMD_GET_STATE]   = { ST_CMD_SIZE, ST_RSP_SIZE(get_state) },
+    [CHARGE_STATE_CMD_GET_PARAM]  = { ST_PRM_SIZE(get_param), ST_RSP_SIZE(get_param) },
+    [CHARGE_STATE_CMD_SET_PARAM]  = { ST_PRM_SIZE(set_param), 0 },
+};
+
+BUILD_ASSERT(ARRAY_SIZE(cs_paramcount) == CHARGE_STATE_NUM_CMDS);
+
+#undef ST_CMD_SIZE
+#undef ST_PRM_SIZE
+#undef ST_RSP_SIZE
+
+// Wrapper to send EC_CMD_CHARGE_STATE with correct sizes
+static int cs_do_cmd(struct ec_params_charge_state *to_ec,
+                     struct ec_response_charge_state *from_ec)
+{
+    int rv;
+    int cmd = to_ec->cmd;
+
+    if (cmd < 0 || cmd >= CHARGE_STATE_NUM_CMDS)
+        return 1;
+
+    rv = ec_command(EC_CMD_CHARGE_STATE, 0,
+                    to_ec, cs_paramcount[cmd].to_ec_size,
+                    from_ec, cs_paramcount[cmd].from_ec_size);
+    return (rv < 0) ? 1 : 0;
+}
+
 // -----------------------------------------------------------------------------
 // Top-level General Functions
 // -----------------------------------------------------------------------------
@@ -167,6 +204,35 @@ int ec_is_on_ac(int *ac_present) {
     return 0;
 }
 
+int ec_get_charge_state(struct ec_charge_state_info *info_out) {
+    struct ec_params_charge_state param;
+    struct ec_response_charge_state resp;
+    int ret;
+
+    if (!info_out)
+        return EC_ERR_INVALID_PARAM;
+
+    ret = libectool_init();
+    if (ret < 0)
+        return EC_ERR_INIT;
+
+    param.cmd = CHARGE_STATE_CMD_GET_STATE;
+    ret = cs_do_cmd(&param, &resp);
+    if (ret) {
+        libectool_release();
+        return EC_ERR_EC_COMMAND;
+    }
+
+    info_out->ac = resp.get_state.ac;
+    info_out->chg_voltage = resp.get_state.chg_voltage;
+    info_out->chg_current = resp.get_state.chg_current;
+    info_out->chg_input_current = resp.get_state.chg_input_current;
+    info_out->batt_state_of_charge = resp.get_state.batt_state_of_charge;
+
+    libectool_release();
+    return 0;
+}
+
 // -----------------------------------------------------------------------------
 // Top-level fan control Functions
 // -----------------------------------------------------------------------------
@@ -192,7 +258,7 @@ int ec_get_num_fans(int *val) {
 
         if (ret <= 0)
             return EC_ERR_READMEM;
-        
+
         if ((int)fan_val == EC_FAN_SPEED_NOT_PRESENT)
             break;
     }
@@ -429,7 +495,7 @@ int ec_get_all_fans_rpm(int *rpms, int rpms_size, int *num_fans_out) {
             default:
                 rpms[i] = val;
         }
-        
+
     }
 
     libectool_release();

@@ -10,6 +10,16 @@ void ECController::handle_error(int code, const std::string &msg) {
         case EC_ERR_READMEM:        reason = "EC memory read failed"; break;
         case EC_ERR_EC_COMMAND:     reason = "EC command failed"; break;
         case EC_ERR_INVALID_PARAM:  reason = "Invalid parameter"; break;
+        case EC_ERR_SENSOR_UNAVAILABLE:
+            reason = "Sensor unavailable or not calibrated/powered";
+            break;
+        case EC_ERR_UNSUPPORTED_VER:
+            reason = "Unsupported EC command version";
+            break;
+
+        case EC_ERR_INVALID_RESPONSE:
+            reason = "Invalid response from EC";
+            break;
         default:                    reason = "Unknown error"; break;
     }
 

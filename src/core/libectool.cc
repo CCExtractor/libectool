@@ -113,9 +113,9 @@ int read_mapped_temperature(int id)
 
 // Charge state parameter count table
 #define ST_FLD_SIZE(ST, FLD) sizeof(((struct ST *)0)->FLD)
-#define ST_CMD_SIZE ST_FLD_SIZE(struct ec_params_charge_state, cmd)
-#define ST_PRM_SIZE(SUBCMD) (ST_CMD_SIZE + ST_FLD_SIZE(struct ec_params_charge_state, SUBCMD))
-#define ST_RSP_SIZE(SUBCMD) ST_FLD_SIZE(struct ec_response_charge_state, SUBCMD)
+#define ST_CMD_SIZE ST_FLD_SIZE(ec_params_charge_state, cmd)
+#define ST_PRM_SIZE(SUBCMD) (ST_CMD_SIZE + ST_FLD_SIZE(ec_params_charge_state, SUBCMD))
+#define ST_RSP_SIZE(SUBCMD) ST_FLD_SIZE(ec_response_charge_state, SUBCMD)
 
 static const struct {
     uint8_t to_ec_size;

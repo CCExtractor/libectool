@@ -76,7 +76,33 @@ def test_get_num_temp_sensors():
 
 def test_get_temp_info():
     py_info = ec.get_temp_info(0)
-    print(f"[get_temp_info] pyectool={py_info}")
+
+    tempsinfo_out = run_ectool_command("ectool tempsinfo 0")
+    temps_out = run_ectool_command("ectool temps 0")
+
+    # Parse ectool tempsinfo
+    name_match = re.search(r"Sensor name:\s*(\S+)", tempsinfo_out)
+    type_match = re.search(r"Sensor type:\s*(\d+)", tempsinfo_out)
+
+    # Parse ectool temps
+    temp_match = re.search(r"= (\d+)\s*C", temps_out)
+    fan_vals_match = re.search(r"\((\d+)\s*K and (\d+)\s*K\)", temps_out)
+
+    assert name_match and type_match and temp_match and fan_vals_match, "Failed to parse ectool output"
+
+    ectool_info = {
+        "sensor_name": name_match.group(1),
+        "sensor_type": int(type_match.group(1)),
+        "temp": int(temp_match.group(1)),
+        "temp_fan_off": int(int(fan_vals_match.group(1)) - 273),
+        "temp_fan_max": int(int(fan_vals_match.group(2)) - 273),
+    }
+
+    print(f"[get_temp_info] pyectool={py_info}, ectool={ectool_info}")
+
+    # Assert fields match
+    for key in ectool_info:
+        assert py_info[key] == ectool_info[key], f"Mismatch in '{key}': pyectool={py_info[key]}, ectool={ectool_info[key]}"
 
 def test_get_all_fans_rpm():
     py_vals = ec.get_all_fans_rpm()

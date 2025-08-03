@@ -2,18 +2,30 @@
 requires = ["scikit-build-core>=0.10", "pybind11"]
 build-backend = "scikit_build_core.build"
 
-
 [project]
 name = "pyectool"
-version = "0.1.0"
-description="Python bindings for ectool using pybind11, enabling seamless integration with other applications"
+version = "0.2.0"
+description="Pyectool provides Python bindings for interacting with the Embedded Controller (EC) on ChromeOS and Framework devices, enabling seamless integration with other applications"
 readme = "README.md"
 authors = [
   { name = "Ahmed Gamea", email = "ahmed.gamea@ejust.edu.eg" },
 ]
+license = {file = "LICENSE"}
+keywords = ["ectool", "embedded controller", "EC", "pybind11", "bindings"]
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: C++",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: POSIX :: Linux",
+]
+
+[project.urls]
+Homepage = "https://github.com/CCExtractor/libectool"
+Issues = "https://github.com/CCExtractor/libectool/issues"
 
 [tool.scikit-build]
-minimum-version = "build-system.requires"
+minimum-version = "0.10"
 
 [tool.cibuildwheel]
 build-frontend = "build[uv]"

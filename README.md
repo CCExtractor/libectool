@@ -26,28 +26,45 @@ Install system dependencies:
 sudo apt update
 sudo apt install -y libusb-1.0-0-dev libftdi1-dev pkg-config
 ````
-### Clone the repository
+---
 
-### Install the package
+### Option 1: Install from PyPI (recommended)
 
-#### Option 1: System-wide (not recommended unless you know what you're doing)
-```sh
-sudo pip install .
-```
-Or:
-
-```bash
-sudo env "PIP_BREAK_SYSTEM_PACKAGES=1" pip install .
-```
-(Required on modern distros like Ubuntu 24.04 due to PEP 668.)
-
-#### Option 2: Isolated virtual environment (recommended)
+Create and activate a virtual environment:
 ```bash
 python3 -m venv ~/.venv/pyectool
 source ~/.venv/pyectool/bin/activate
-pip install .
+```
+Install from PyPI:
+```bash
+pip install pyectool
 ```
 
+Test installation (requires `sudo` to access the EC):
+
+```bash
+sudo env "PATH=$PATH" python -c "from pyectool import ECController; ec = ECController(); print(ec.is_on_ac())"
+```
+This will print `True` if the system is on AC power, or `False` if on battery.
+
+---
+
+### Option 2: Install from source
+
+Clone the repository:
+```bash
+git clone https://github.com/CCExtractor/libectool
+cd libectool
+```
+Create and activate a virtual environment:
+```bash
+python3 -m venv ~/.venv/pyectool
+source ~/.venv/pyectool/bin/activate
+```
+Install the package:
+```bash
+sudo pip install .
+```
 ### ⚠️ Important Note
 
 After installation, **do not run Python from inside the `libectool/` directory**. It contains a `pyectool/` folder that may shadow the installed package.
@@ -56,17 +73,9 @@ Instead, test from a different directory:
 
 ```bash
 cd ..
-sudo python -c "from pyectool import ECController; ec = ECController(); print(ec.is_on_ac())"
-```
-
-If you're using a virtual environment and want to preserve its `PATH`, use:
-```bash
-cd ..
 sudo env "PATH=$PATH" python -c "from pyectool import ECController; ec = ECController(); print(ec.is_on_ac())"
 ```
-This ensures the correct Python from your virtual environment is used even with `sudo`.
-
----
+'env "PATH=$PATH"' preserve venv path and ensures the correct Python from your virtual environment is used even with `sudo`.
 
 ## Usage
 

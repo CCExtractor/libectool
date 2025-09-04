@@ -56,7 +56,7 @@ Instead, test from a different directory:
 
 ```bash
 cd ..
-python -c "from pyectool import ECController; ec = ECController(); print(ec.is_on_ac())"
+sudo python -c "from pyectool import ECController; ec = ECController(); print(ec.is_on_ac())"
 ```
 
 If you're using a virtual environment and want to preserve its `PATH`, use:
